@@ -1,0 +1,45 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+- main
+
+pool:
+  vmImage: ubuntu-latest
+
+stages:
+- stage: TerraformValidate
+  jobs:
+  - job: TerraformValidateJob
+    continueOnError: false
+    steps:
+    - task: PublishBuildArtifacts@1
+      displayName: Publish Artifacts
+      inputs:
+          PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+          ArtifactName: 'terraform-manifests-out'
+          publishLocation: 'Container'
+    - task: TerraformInstaller@1
+      displayName: Terraform Install 
+      inputs:
+        terraformVersion: 'latest'
+    - task: TerraformTaskV4@4
+      displayName: Terraform Init
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/terraform-manifests'
+        backendServiceArm: 'terraform-aks-azurerm-svc-con'
+        backendAzureRmResourceGroupName: 'DefaultResourceGroup-EUS'
+        backendAzureRmStorageAccountName: 'terrastore10'
+        backendAzureRmContainerName: 'tstate'
+        backendAzureRmKey: 'aksdev.tfstate'
+
+    - task: TerraformTaskV4@4
+      displayName: Terraform Validate
+      inputs:
+        provider: 'azurerm'
+        command: 'validate'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/terraform-manifests'
