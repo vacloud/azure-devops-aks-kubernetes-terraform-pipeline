@@ -1,0 +1,99 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+- main
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+- name: DEV_ENVIRONMENT
+  value: dev
+- name: QA_ENVIRONMENT
+  value: qa 
+
+stages:
+- stage: TerraformValidate
+  jobs:
+  - job: TerraformValidateJob
+    continueOnError: false
+    steps:
+    - task: PublishBuildArtifacts@1
+      displayName: Publish Artifacts
+      inputs:
+          PathtoPublish: '$(System.DefaultWorkingDirectory)/terraform-manifests'
+          ArtifactName: 'terraform-manifests-out'
+          publishLocation: 'Container'
+    - task: TerraformInstaller@1
+      displayName: Terraform Install 
+      inputs:
+        terraformVersion: 'latest'
+    - task: TerraformTaskV4@4
+      displayName: Terraform Init
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/terraform-manifests'
+        backendServiceArm: 'terraform-aks-azurerm-svc-con'
+        backendAzureRmResourceGroupName: 'DefaultResourceGroup-EUS'
+        backendAzureRmStorageAccountName: 'terrastore10'
+        backendAzureRmContainerName: 'tstate'
+        backendAzureRmKey: 'aksdev.tfstate'
+
+    - task: TerraformTaskV4@4
+      displayName: Terraform Validate
+      inputs:
+        provider: 'azurerm'
+        command: 'validate'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/terraform-manifests'
+
+- stage: DeployASKClusters
+  jobs:
+   - deployment: DeployDevASKCluster
+     displayName: DeployDevAKSCluster
+     pool: 
+      vmImage: 'ubuntu-latest'
+     environment: $(DEV_ENVIRONMENT)
+     strategy:
+      runOnce:
+        deploy:
+          steps:
+            - task: DownloadSecureFile@1
+              name: sshkey
+              displayName: Download SSH Key
+              
+              inputs:
+               secureFile: 'aks-terraform-devops-ssh-key-ububtu.pub'
+            
+            - task: TerraformTaskV4@4
+              displayName: Terraform Init
+              inputs:
+                provider: 'azurerm'
+                command: 'init'
+                workingDirectory: '$(Pipeline.Workspace)/terraform-manifests-out'
+                backendServiceArm: 'terraform-aks-azurerm-svc-con'
+                backendAzureRmResourceGroupName: 'DefaultResourceGroup-EUS'
+                backendAzureRmStorageAccountName: 'terrastore10'
+                backendAzureRmContainerName: 'tstate'
+                backendAzureRmKey: 'aks$(DEV_ENVIRONMENT).tfstate'
+            
+            - task: TerraformTaskV4@4
+              displayName: Terraform Plan
+              inputs:
+                provider: 'azurerm'
+                command: 'plan'
+                workingDirectory: '$(Pipeline.Workspace)/terraform-manifests-out'
+                commandOptions: '-var ssh_public_key=$(sshkey.secureFilePath)  -var environment=$(DEV_ENVIRONMENT)  -out $(Pipeline.Workspace)/terraform-manifests-out/$(DEV_ENVIRONMENT)-$(Build.BuildId).out'
+                environmentServiceNameAzureRM: 'terraform-aks-azurerm-svc-con'
+
+            - task: TerraformTaskV4@4
+              displayName: Terraform Apply
+              inputs:
+                provider: 'azurerm'
+                command: 'apply'
+                workingDirectory: '$(Pipeline.Workspace)/terraform-manifests-out'
+                commandOptions: '$(Pipeline.Workspace)/terraform-manifests-out/$(DEV_ENVIRONMENT)-$(Build.BuildId).out'
+                environmentServiceNameAzureRM: 'terraform-aks-azurerm-svc-con'
