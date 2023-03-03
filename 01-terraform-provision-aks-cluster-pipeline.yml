@@ -24,7 +24,7 @@ stages:
     - task: PublishBuildArtifacts@1
       displayName: Publish Artifacts
       inputs:
-          PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+          PathtoPublish: '$(System.DefaultWorkingDirectory)/terraform-manifests'
           ArtifactName: 'terraform-manifests-out'
           publishLocation: 'Container'
     - task: TerraformInstaller@1
@@ -73,7 +73,7 @@ stages:
               inputs:
                 provider: 'azurerm'
                 command: 'init'
-                workingDirectory: '$(System.DefaultWorkingDirectory)/terraform-manifests'
+                workingDirectory: '$(Pipeline.Workspace)/terraform-manifests-out'
                 backendServiceArm: 'terraform-aks-azurerm-svc-con'
                 backendAzureRmResourceGroupName: 'DefaultResourceGroup-EUS'
                 backendAzureRmStorageAccountName: 'terrastore10'
@@ -85,7 +85,7 @@ stages:
               inputs:
                 provider: 'azurerm'
                 command: 'plan'
-                workingDirectory: '$(System.DefaultWorkingDirectory)/terraform-manifests'
+                workingDirectory: '$(Pipeline.Workspace)/terraform-manifests-out'
                 commandOptions: '-var ssh_public_key=$(sshkey.secureFilePath)  -var environment=$(DEV_ENVIRONMENT)  -out $(Pipeline.Workspace)/terraform-manifests/$(DEV_ENVIRONMENT)-$(Build.BuildId).out'
                 environmentServiceNameAzureRM: 'terraform-aks-azurerm-svc-con'
 
@@ -94,6 +94,6 @@ stages:
               inputs:
                 provider: 'azurerm'
                 command: 'apply'
-                workingDirectory: '$(System.DefaultWorkingDirectory)/terraform-manifests'
+                workingDirectory: '$(System.DefaultWorkingDirectory)/terraform-manifests-out'
                 commandOptions: '$(Pipeline.Workspace)/terraform-manifests/$(DEV_ENVIRONMENT)-$(Build.BuildId).out'
                 environmentServiceNameAzureRM: 'terraform-aks-azurerm-svc-con'
