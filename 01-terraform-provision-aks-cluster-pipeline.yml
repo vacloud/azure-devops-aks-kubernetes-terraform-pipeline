@@ -24,7 +24,7 @@ stages:
     - task: PublishBuildArtifacts@1
       displayName: Publish Artifacts
       inputs:
-          PathtoPublish: '$(Build.ArtifactStagingDirectory)/terraform-manifests'
+          PathtoPublish: '$(Build.ArtifactStagingDirectory)'
           ArtifactName: 'terraform-manifests-out'
           publishLocation: 'Container'
     - task: TerraformInstaller@1
